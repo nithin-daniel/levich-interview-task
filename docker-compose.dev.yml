@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: levich-postgres-dev
+    environment:
+      POSTGRES_DB: levich_interview_dev
+      POSTGRES_USER: levich_user
+      POSTGRES_PASSWORD: levich_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - levich-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U levich_user -d levich_interview_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Server (Backend API) - Development
+  server-dev:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: levich-server-dev
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://levich_user:levich_password@db:5432/levich_interview_dev
+      - JWT_SECRET=dev-jwt-secret-not-for-production
+      - JWT_EXPIRES_IN=24h
+      - LOG_LEVEL=debug
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - levich-dev-network
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+      - ./server/logs:/app/logs
+    command: npm run dev
+    restart: unless-stopped
+
+  # Client (Frontend) - Development
+  client-dev:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: levich-client-dev
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server-dev
+    networks:
+      - levich-dev-network
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+      - /app/.next
+    command: pnpm dev
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+
+networks:
+  levich-dev-network:
+    driver: bridge

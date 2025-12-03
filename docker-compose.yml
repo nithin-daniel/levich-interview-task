@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: levich-postgres
+    environment:
+      POSTGRES_DB: levich_interview
+      POSTGRES_USER: levich_user
+      POSTGRES_PASSWORD: levich_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - levich-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U levich_user -d levich_interview"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Server (Backend API)
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: levich-server
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://levich_user:levich_password@db:5432/levich_interview
+      - JWT_SECRET=your-production-jwt-secret-change-this
+      - JWT_EXPIRES_IN=24h
+      - LOG_LEVEL=info
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - levich-network
+    volumes:
+      - ./server/logs:/app/logs
+    restart: unless-stopped
+
+  # Client (Frontend)
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: levich-client
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    networks:
+      - levich-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  levich-network:
+    driver: bridge
