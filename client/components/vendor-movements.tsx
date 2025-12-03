@@ -4,6 +4,10 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Plus,
   RefreshCw,
@@ -134,6 +138,14 @@ export function VendorMovements() {
   const [activeTab, setActiveTab] = useState<TabType>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedVendors, setSelectedVendors] = useState<number[]>([])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [formData, setFormData] = useState({
+    name: "",
+    domain: "",
+    rating: "",
+    status: "Active",
+    categories: [] as string[]
+  })
 
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
@@ -182,10 +194,131 @@ export function VendorMovements() {
           <RefreshCw className="w-4 h-4" />
           Import
         </Button>
-        <Button size="sm" className="gap-2 bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm">
-          <Plus className="w-4 h-4" />
-          Add vendor
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-2 bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm">
+              <Plus className="w-4 h-4" />
+              Add vendor
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add New Vendor</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                // Here you would typically handle the form submission
+                console.log("Form submitted:", formData)
+                setIsDialogOpen(false)
+                // Reset form
+                setFormData({
+                  name: "",
+                  domain: "",
+                  rating: "",
+                  status: "Active",
+                  categories: []
+                })
+              }}
+              className="space-y-4 mt-4"
+            >
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Vendor Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter vendor name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="domain">Domain</Label>
+                  <Input
+                    id="domain"
+                    placeholder="example.com"
+                    value={formData.domain}
+                    onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rating">Security Rating (0-100)</Label>
+                  <Input
+                    id="rating"
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="75"
+                    value={formData.rating}
+                    onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Categories</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["Customer data", "Admin", "Business data", "Financials", "Database access", "Salesforce"].map((category) => (
+                      <div key={category} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={category}
+                          checked={formData.categories.includes(category)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setFormData({
+                                ...formData,
+                                categories: [...formData.categories, category]
+                              })
+                            } else {
+                              setFormData({
+                                ...formData,
+                                categories: formData.categories.filter(c => c !== category)
+                              })
+                            }
+                          }}
+                        />
+                        <Label htmlFor={category} className="text-sm font-normal">
+                          {category}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  Add Vendor
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex items-center gap-2">
