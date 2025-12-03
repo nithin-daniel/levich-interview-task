@@ -1,102 +1,160 @@
-import { Request, Response } from 'express';
-import { registerUser, loginUser, RegisterData, LoginData } from '../services/auth.service';
-
-// Function to validate email format
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-// Function to send success response
-function sendSuccess(res: Response, data: any, message?: string, statusCode: number = 200) {
-  res.status(statusCode).json({
-    success: true,
-    message,
-    data,
-    timestamp: new Date().toISOString()
-  });
-}
-
-// Function to send error response
-function sendError(res: Response, message: string, statusCode: number = 500) {
-  res.status(statusCode).json({
-    success: false,
-    message,
-    timestamp: new Date().toISOString()
-  });
-}
+import { Request, Response } from "express";
+import {
+  registerUser,
+  loginUser,
+  RegisterData,
+  LoginData,
+} from "../services/auth.service";
+import {
+  sendSuccessResponse,
+  sendErrorResponse,
+  sendValidationError,
+} from "../utils/responseHandler";
+import { logger } from "../utils/logger";
+import {
+  isValidEmail,
+  isValidPassword,
+  validateRequiredFields,
+  sanitizeEmail,
+  createTimer
+} from "../utils/validation";
 
 // Register new user
 export async function register(req: Request, res: Response): Promise<void> {
+  const timer = createTimer();
+  logger.info("User registration attempt started", {
+    ip: req.ip,
+    userAgent: req.get("User-Agent"),
+  });
+
   try {
     const { email, password } = req.body as RegisterData;
 
     // Validate required fields
-    if (!email || !password) {
-      sendError(res, 'Email and password are required', 400);
+    const validation = validateRequiredFields(req.body, ['email', 'password']);
+    if (!validation.isValid) {
+      logger.warn("Registration failed: Missing required fields", {
+        missingFields: validation.missingFields,
+      });
+      sendValidationError(res, `Missing required fields: ${validation.missingFields.join(', ')}`);
       return;
     }
 
+    // Sanitize email
+    const sanitizedEmail = sanitizeEmail(email);
+
     // Validate email format
-    if (!isValidEmail(email)) {
-      sendError(res, 'Invalid email format', 400);
+    if (!isValidEmail(sanitizedEmail)) {
+      logger.warn("Registration failed: Invalid email format", { email: sanitizedEmail });
+      sendValidationError(res, "Invalid email format");
       return;
     }
 
     // Validate password length
-    if (password.length < 6) {
-      sendError(res, 'Password must be at least 6 characters long', 400);
+    if (!isValidPassword(password)) {
+      logger.warn("Registration failed: Password too short", {
+        passwordLength: password.length,
+      });
+      sendValidationError(res, "Password must be at least 6 characters long");
       return;
     }
 
-    const result = await registerUser({ email, password });
+    const result = await registerUser({ email: sanitizedEmail, password });
 
-    sendSuccess(res, result, 'User registered successfully', 201);
+    logger.info("User registration successful", {
+      userId: result.user.id,
+      email: result.user.email,
+      duration: timer.getElapsedFormatted(),
+    });
+
+    sendSuccessResponse(res, result, "User registered successfully", 201);
   } catch (error) {
-    console.error('Registration error:', error);
-    
-    if (error instanceof Error && error.message === 'User with this email already exists') {
-      sendError(res, error.message, 409);
+    logger.error("Registration error occurred", {
+      error: error instanceof Error ? error.message : error,
+      duration: timer.getElapsedFormatted(),
+    });
+
+    if (
+      error instanceof Error &&
+      error.message === "User with this email already exists"
+    ) {
+      sendErrorResponse(res, error.message, 409);
     } else {
-      sendError(res, 'Internal server error during registration', 500);
+      sendErrorResponse(
+        res,
+        "Internal server error during registration",
+        500,
+        error
+      );
     }
   }
 }
 
 // Login user
 export async function login(req: Request, res: Response): Promise<void> {
+  const timer = createTimer();
+  logger.info("User login attempt started", {
+    ip: req.ip,
+    userAgent: req.get("User-Agent"),
+  });
+
   try {
     const { email, password } = req.body as LoginData;
 
     // Validate required fields
-    if (!email || !password) {
-      sendError(res, 'Email and password are required', 400);
+    const validation = validateRequiredFields(req.body, ['email', 'password']);
+    if (!validation.isValid) {
+      logger.warn("Login failed: Missing required fields", {
+        missingFields: validation.missingFields,
+      });
+      sendValidationError(res, `Missing required fields: ${validation.missingFields.join(', ')}`);
       return;
     }
 
-    const result = await loginUser({ email, password });
+    // Sanitize email
+    const sanitizedEmail = sanitizeEmail(email);
 
-    sendSuccess(res, result, 'Login successful');
+    const result = await loginUser({ email: sanitizedEmail, password });
+
+    logger.info("User login successful", {
+      userId: result.user.id,
+      email: result.user.email,
+      duration: timer.getElapsedFormatted(),
+    });
+
+    sendSuccessResponse(res, result, "Login successful");
   } catch (error) {
-    console.error('Login error:', error);
-    
-    if (error instanceof Error && error.message === 'Invalid email or password') {
-      sendError(res, error.message, 401);
+    logger.warn("Login failed", {
+      email: req.body.email,
+      error: error instanceof Error ? error.message : error,
+      duration: timer.getElapsedFormatted(),
+    });
+
+    if (
+      error instanceof Error &&
+      error.message === "Invalid email or password"
+    ) {
+      sendErrorResponse(res, error.message, 401);
     } else {
-      sendError(res, 'Internal server error during login', 500);
+      sendErrorResponse(res, "Internal server error during login", 500, error);
     }
   }
 }
 
 // Get current user profile
-export async function getCurrentUser(req: Request, res: Response): Promise<void> {
+export async function getCurrentUser(
+  req: Request,
+  res: Response
+): Promise<void> {
   try {
     // User info is attached by the auth middleware
     const user = (req as any).user;
 
-    sendSuccess(res, { user }, 'User profile retrieved successfully');
+    logger.info("User profile retrieved", { userId: user?.id });
+
+    sendSuccessResponse(res, { user }, "User profile retrieved successfully");
   } catch (error) {
-    console.error('Get user profile error:', error);
-    sendError(res, 'Internal server error', 500);
+    logger.error("Error retrieving user profile", { error });
+    sendErrorResponse(res, "Internal server error", 500, error);
   }
 }

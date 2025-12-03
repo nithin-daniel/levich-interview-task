@@ -1,5 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../services/auth.service';
+import { Request, Response, NextFunction } from "express";
+import { verifyToken } from "../services/auth.service";
+import { sendAuthError } from "../utils/responseHandler";
+import { logger } from "../utils/logger";
 
 // Extend Request interface to include user
 declare global {
@@ -13,15 +15,6 @@ declare global {
   }
 }
 
-// Function to send authentication error
-function sendAuthError(res: Response, message: string, statusCode: number = 401) {
-  res.status(statusCode).json({
-    success: false,
-    message,
-    timestamp: new Date().toISOString()
-  });
-}
-
 // Required authentication middleware
 export async function authMiddleware(
   req: Request,
@@ -30,19 +23,35 @@ export async function authMiddleware(
 ): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
+    const requestId = req.get("X-Request-ID") || "unknown";
+
+    logger.debug("Authentication middleware triggered", {
+      path: req.path,
+      method: req.method,
+      requestId,
+      hasAuthHeader: !!authHeader,
+    });
 
     if (!authHeader) {
-      sendAuthError(res, 'Access token is missing');
+      logger.warn("Authentication failed: No authorization header", {
+        path: req.path,
+        requestId,
+      });
+      sendAuthError(res, "Access token is missing");
       return;
     }
 
     // Check if it's Bearer token
-    const token = authHeader.startsWith('Bearer ')
+    const token = authHeader.startsWith("Bearer ")
       ? authHeader.substring(7)
       : authHeader;
 
     if (!token) {
-      sendAuthError(res, 'Access token is missing');
+      logger.warn("Authentication failed: No token in authorization header", {
+        path: req.path,
+        requestId,
+      });
+      sendAuthError(res, "Access token is missing");
       return;
     }
 
@@ -52,13 +61,26 @@ export async function authMiddleware(
     // Attach user to request object
     req.user = user;
 
+    logger.debug("Authentication successful", {
+      userId: user.id,
+      email: user.email,
+      path: req.path,
+      requestId,
+    });
+
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    logger.warn("Authentication middleware error", {
+      path: req.path,
+      error: error instanceof Error ? error.message : error,
+    });
 
-    let message = 'Authentication failed';
+    let message = "Authentication failed";
     if (error instanceof Error) {
-      if (error.message.includes('Invalid') || error.message.includes('expired')) {
+      if (
+        error.message.includes("Invalid") ||
+        error.message.includes("expired")
+      ) {
         message = error.message;
       }
     }
@@ -75,17 +97,32 @@ export async function optionalAuthMiddleware(
 ): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
+    const requestId = req.get("X-Request-ID") || "unknown";
+
+    logger.debug("Optional authentication middleware triggered", {
+      path: req.path,
+      method: req.method,
+      requestId,
+      hasAuthHeader: !!authHeader,
+    });
 
     if (!authHeader) {
+      logger.debug("No authentication header, proceeding without auth", {
+        path: req.path,
+      });
       next();
       return;
     }
 
-    const token = authHeader.startsWith('Bearer ')
+    const token = authHeader.startsWith("Bearer ")
       ? authHeader.substring(7)
       : authHeader;
 
     if (!token) {
+      logger.debug(
+        "No token in authorization header, proceeding without auth",
+        { path: req.path }
+      );
       next();
       return;
     }
@@ -96,9 +133,19 @@ export async function optionalAuthMiddleware(
     // Attach user to request object
     req.user = user;
 
+    logger.debug("Optional authentication successful", {
+      userId: user.id,
+      email: user.email,
+      path: req.path,
+    });
+
     next();
   } catch (error) {
     // For optional auth, we just continue without user
+    logger.debug("Optional authentication failed, proceeding without auth", {
+      path: req.path,
+      error: error instanceof Error ? error.message : error,
+    });
     next();
   }
 }
