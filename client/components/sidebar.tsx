@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect } from "react"
-import { Home, LayoutGrid, Users, FolderOpen, Clock, UserCog, Settings, HelpCircle, X } from "lucide-react"
+import { Home, LayoutGrid, Users, FolderOpen, Clock, UserCog, Settings, HelpCircle, X, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/auth"
 
 interface SidebarProps {
   open: boolean
@@ -24,6 +26,8 @@ const bottomItems = [
 ]
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const { user, logout } = useAuth()
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
@@ -31,6 +35,21 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     window.addEventListener("keydown", handleEscape)
     return () => window.removeEventListener("keydown", handleEscape)
   }, [onClose])
+
+  // Extract first name from email for display
+  const getFirstName = (email: string) => {
+    return email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1)
+  }
+
+  // Get avatar initials from email
+  const getInitials = (email: string) => {
+    return email.charAt(0).toUpperCase()
+  }
+
+  const handleLogout = () => {
+    logout()
+    onClose()
+  }
 
   return (
     <>
@@ -93,14 +112,31 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </a>
           ))}
 
+          {/* Logout Button */}
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors lg:justify-center lg:px-0 h-auto"
+            title="Logout"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <span className="lg:hidden font-medium">Logout</span>
+          </Button>
+
           {/* User Avatar */}
-          <div className="flex items-center gap-3 px-3 py-3 lg:justify-center lg:px-0 mt-2">
-            <Avatar className="w-9 h-9">
-              <AvatarImage src="/professional-woman-avatar.png" />
-              <AvatarFallback className="bg-purple-100 text-purple-600">O</AvatarFallback>
-            </Avatar>
-            <span className="lg:hidden font-medium text-foreground">Olivia</span>
-          </div>
+          {user && (
+            <div className="flex items-center gap-3 px-3 py-3 lg:justify-center lg:px-0 mt-2">
+              <Avatar className="w-9 h-9">
+                <AvatarImage src="/professional-woman-avatar.png" />
+                <AvatarFallback className="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                  {getInitials(user.email)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="lg:hidden font-medium text-foreground">
+                {getFirstName(user.email)}
+              </span>
+            </div>
+          )}
         </div>
       </aside>
     </>
