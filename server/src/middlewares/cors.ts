@@ -1,18 +1,25 @@
 import cors from "cors";
 
-const corsOptions = {
-  origin: [
-    "http://localhost:3000", // Next.js development server
-    "http://127.0.0.1:3000",
-    "https://localhost:3000",
-     process.env.FRONTEND_URL || "", // Production frontend URL
-    "https://levich-interview-task.vercel.app", // for testing purpose the above env is not taking
-    // Add your production domains here
-  ],
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://levich-interview-task.vercel.app",
+  process.env.FRONTEND_URL,
+];
+
+export const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    // allow mobile apps / curl / no-origin requests
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.log("Blocked by CORS:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
-  optionsSuccessStatus: 200,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-};
-
-export const corsMiddleware = cors(corsOptions);
+});
