@@ -1,12 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
+  output: "standalone",
+
+  experimental: {
+    runtime: "nodejs",        // force global node runtime
   },
+
+  // stop Next from trying to use Edge automatically
+  middleware: false,          
+
   images: {
     unoptimized: true,
   },
-  output: 'standalone',
-}
 
-export default nextConfig
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+};
+
+export default nextConfig;
