@@ -6,21 +6,32 @@ services:
     image: postgres:15
     container_name: levich-postgres-dev
     environment:
-      POSTGRES_DB: levich_interview_dev
+      POSTGRES_DB: levich_interview
       POSTGRES_USER: levich_user
       POSTGRES_PASSWORD: levich_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      TZ: UTC
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    networks:
-      - levich-dev-network
+    command: [
+      "postgres",
+      "-c", "timezone=UTC",
+      "-c", "log_statement=all",
+      "-c", "shared_preload_libraries=pg_stat_statements"
+    ]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U levich_user -d levich_interview_dev"]
+      test: [
+        "CMD-SHELL",
+        "pg_isready -U levich_user -d levich_interview && psql -U levich_user -d levich_interview -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";' || exit 0"
+      ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    networks:
+      - levich-dev-network
 
   # Server (Backend API) - Development
   server-dev:
