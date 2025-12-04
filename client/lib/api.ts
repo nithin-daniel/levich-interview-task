@@ -86,6 +86,20 @@ export interface VendorFilters {
   sortOrder?: 'asc' | 'desc'
 }
 
+export interface Pagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  pagination: Pagination
+}
+
 // =============================================================================
 // AXIOS CONFIGURATION
 // =============================================================================

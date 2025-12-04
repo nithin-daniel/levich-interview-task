@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { apiService, type Vendor, type CreateVendorData } from "@/lib/api"
+import { toast } from "sonner"
 import {
   Plus,
   RefreshCw,
@@ -23,8 +25,18 @@ import {
   MoreVertical,
 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination"
 
-const vendors = [
+// Static fallback data - will be replaced by API data
+const fallbackVendors: Vendor[] = [
   {
     id: 1,
     name: "Ephemeral",
@@ -39,6 +51,8 @@ const vendors = [
     categories: ["Customer data", "Admin"],
     extraCategories: 4,
     monitored: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
   },
   {
     id: 2,
@@ -54,6 +68,8 @@ const vendors = [
     categories: ["Business data", "Admin"],
     extraCategories: 4,
     monitored: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
   },
   {
     id: 3,
@@ -69,66 +85,8 @@ const vendors = [
     categories: ["Customer data", "Financials"],
     extraCategories: 0,
     monitored: true,
-  },
-  {
-    id: 4,
-    name: "CloudWatch",
-    domain: "cloudwatch.app",
-    logo: "C",
-    logoColor: "from-blue-400 to-blue-600",
-    rating: 38,
-    trend: 8,
-    trendUp: true,
-    lastAssessed: "26 Jan 2025",
-    status: "Active",
-    categories: ["Database access", "Admin"],
-    extraCategories: 0,
-    monitored: false,
-  },
-  {
-    id: 5,
-    name: "ContrastAI",
-    domain: "contrastai.com",
-    logo: "C",
-    logoColor: "from-indigo-400 to-indigo-600",
-    rating: 42,
-    trend: 1,
-    trendUp: false,
-    lastAssessed: "18 Jan 2025",
-    status: "Active",
-    categories: ["Salesforce", "Admin"],
-    extraCategories: 4,
-    monitored: false,
-  },
-  {
-    id: 6,
-    name: "Convergence",
-    domain: "convergence.io",
-    logo: "C",
-    logoColor: "from-purple-400 to-purple-600",
-    rating: 66,
-    trend: 6,
-    trendUp: false,
-    lastAssessed: "28 Jan 2025",
-    status: "Active",
-    categories: ["Business data", "Admin"],
-    extraCategories: 4,
-    monitored: true,
-  },
-  {
-    id: 7,
-    name: "Sisyphus",
-    domain: "sisyphus.com",
-    logo: "S",
-    logoColor: "from-green-400 to-green-600",
-    rating: 91,
-    trend: 2,
-    trendUp: true,
-    lastAssessed: "16 Jan 2025",
-    status: "Inactive",
-    categories: ["Customer data", "Financials"],
-    extraCategories: 0,
-    monitored: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
   },
 ]
 
@@ -139,6 +97,20 @@ export function VendorMovements() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedVendors, setSelectedVendors] = useState<number[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [vendors, setVendors] = useState<Vendor[]>(fallbackVendors)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
+  const [apiData, setApiData] = useState<Vendor[]>([])
+  const [isUsingApiData, setIsUsingApiData] = useState(false)
+  
   const [formData, setFormData] = useState({
     name: "",
     domain: "",
@@ -147,29 +119,201 @@ export function VendorMovements() {
     categories: [] as string[]
   })
 
-  const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch =
-      vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vendor.domain.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "monitored" && vendor.monitored) ||
-      (activeTab === "unmonitored" && !vendor.monitored)
-    return matchesSearch && matchesTab
-  })
+  // When using API data, pagination is handled by the server
+  // When using fallback data, we handle pagination client-side
+  const getFilteredVendors = () => {
+    if (isUsingApiData) {
+      // API data is already filtered and paginated by the server
+      return apiData
+    } else {
+      // Fallback to client-side filtering and pagination
+      const filtered = fallbackVendors.filter((vendor) => {
+        const matchesSearch =
+          vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          vendor.domain.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesTab =
+          activeTab === "all" ||
+          (activeTab === "monitored" && vendor.monitored) ||
+          (activeTab === "unmonitored" && !vendor.monitored)
+        return matchesSearch && matchesTab
+      })
+      return filtered.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      )
+    }
+  }
 
-  const allSelected = filteredVendors.length > 0 && filteredVendors.every((v) => selectedVendors.includes(v.id))
+  const paginatedVendors = getFilteredVendors()
+
+  const allSelected = paginatedVendors.length > 0 && paginatedVendors.every((v) => selectedVendors.includes(v.id))
+
+  // Pagination handlers
+  const handlePrevPage = () => {
+    if (isUsingApiData) {
+      if (hasPrev) {
+        fetchVendors(currentPage - 1)
+      }
+    } else {
+      if (currentPage > 1) {
+        setCurrentPage(currentPage - 1)
+      }
+    }
+  }
+
+  const handleNextPage = () => {
+    if (isUsingApiData) {
+      if (hasNext) {
+        fetchVendors(currentPage + 1)
+      }
+    } else {
+      if (currentPage < totalPages) {
+        setCurrentPage(currentPage + 1)
+      }
+    }
+  }
+
+  const handlePageClick = (page: number) => {
+    if (isUsingApiData) {
+      fetchVendors(page)
+    } else {
+      setCurrentPage(page)
+    }
+  }
+
+  // Update total items and pages when filters change (for fallback data only)
+  useEffect(() => {
+    if (!isUsingApiData) {
+      const filtered = fallbackVendors.filter((vendor) => {
+        const matchesSearch =
+          vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          vendor.domain.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesTab =
+          activeTab === "all" ||
+          (activeTab === "monitored" && vendor.monitored) ||
+          (activeTab === "unmonitored" && !vendor.monitored)
+        return matchesSearch && matchesTab
+      })
+      setTotalItems(filtered.length)
+      setTotalPages(Math.ceil(filtered.length / itemsPerPage))
+      
+      // Reset to first page if current page is beyond available pages
+      if (currentPage > Math.ceil(filtered.length / itemsPerPage)) {
+        setCurrentPage(1)
+      }
+    }
+  }, [searchQuery, activeTab, isUsingApiData, currentPage, itemsPerPage])
+
+  // Fetch vendors when filters change (this will reset to page 1)
+  useEffect(() => {
+    fetchVendors(1)
+  }, [searchQuery, activeTab])
+
+  // Fetch vendors on component mount
+  useEffect(() => {
+    fetchVendors()
+  }, [])
+
+  const fetchVendors = async (page = 1) => {
+    try {
+      setIsLoading(true)
+      
+      const response = await apiService.vendors.getAll({
+        page,
+        limit: itemsPerPage,
+        search: searchQuery || undefined,
+        monitored: activeTab === "monitored" ? true : activeTab === "unmonitored" ? false : undefined
+      })
+      
+      if (response.success && response.data) {
+        // Handle the response structure you provided
+        if (response.data.data && Array.isArray(response.data.data)) {
+          // Paginated response structure
+          const { data, pagination } = response.data
+          setApiData(data)
+          setCurrentPage(pagination.page)
+          setTotalItems(pagination.total)
+          setTotalPages(pagination.totalPages)
+          setHasNext(pagination.hasNext)
+          setHasPrev(pagination.hasPrev)
+          setIsUsingApiData(true)
+        } else if (Array.isArray(response.data)) {
+          // Simple array response - fallback
+          setApiData(response.data)
+          setTotalItems(response.data.length)
+          setTotalPages(Math.ceil(response.data.length / itemsPerPage))
+          setHasNext(false)
+          setHasPrev(false)
+          setIsUsingApiData(true)
+        } else {
+          // Fallback to static data
+          console.warn('Unexpected API response structure, using fallback data')
+          setIsUsingApiData(false)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error)
+      toast.error("Failed to fetch vendors. Using cached data.")
+      setIsUsingApiData(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSelectAll = () => {
     if (allSelected) {
       setSelectedVendors([])
     } else {
-      setSelectedVendors(filteredVendors.map((v) => v.id))
+      setSelectedVendors(paginatedVendors.map((v) => v.id))
     }
   }
 
   const handleSelectVendor = (id: number) => {
     setSelectedVendors((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]))
+  }
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    if (isUsingApiData) {
+      fetchVendors(page)
+    } else {
+      setCurrentPage(page)
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1)
+    }
+  }
+
+  const handleNext = () => {
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1)
+    }
+  }
+
+  // Search handler with debounce effect
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (isUsingApiData) {
+        fetchVendors(1) // Reset to first page when searching
+      } else {
+        setCurrentPage(1) // Reset to first page for local filtering
+      }
+    }, 300)
+
+    return () => clearTimeout(delayedSearch)
+  }, [searchQuery])
+
+  // Tab change handler
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    if (isUsingApiData) {
+      fetchVendors(1) // Reset to first page when changing tabs
+    } else {
+      setCurrentPage(1)
+    }
   }
 
   return (
@@ -185,7 +329,7 @@ export function VendorMovements() {
           <MoreVertical className="w-5 h-5 text-muted-foreground" />
         </button>
         <Badge variant="secondary" className="font-normal hidden md:flex">
-          240 vendors
+          {totalItems} vendors
         </Badge>
       </div>
 
@@ -206,19 +350,55 @@ export function VendorMovements() {
               <DialogTitle>Add New Vendor</DialogTitle>
             </DialogHeader>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault()
-                // Here you would typically handle the form submission
-                console.log("Form submitted:", formData)
-                setIsDialogOpen(false)
-                // Reset form
-                setFormData({
-                  name: "",
-                  domain: "",
-                  rating: "",
-                  status: "Active",
-                  categories: []
-                })
+                
+                if (!formData.name.trim() || !formData.domain.trim() || !formData.rating) {
+                  toast.error("Please fill in all required fields.")
+                  return
+                }
+
+                try {
+                  setIsSubmitting(true)
+                  
+                  const vendorData: CreateVendorData = {
+                    name: formData.name.trim(),
+                    domain: formData.domain.trim().toLowerCase(),
+                    rating: parseInt(formData.rating),
+                    status: formData.status,
+                    categories: formData.categories,
+                    monitored: false
+                  }
+
+                  const response = await apiService.vendors.create(vendorData)
+                  
+                  if (response.success) {
+                    toast.success("Vendor created successfully!")
+                    
+                    // Refresh vendor list
+                    await fetchVendors()
+                    
+                    // Close dialog and reset form
+                    setIsDialogOpen(false)
+                    setFormData({
+                      name: "",
+                      domain: "",
+                      rating: "",
+                      status: "Active",
+                      categories: []
+                    })
+                  }
+                } catch (error: any) {
+                  console.error('Failed to create vendor:', error)
+                  
+                  const errorMessage = error?.response?.data?.message || 
+                                     error?.message || 
+                                     'Failed to create vendor. Please try again.'
+                  
+                  toast.error(errorMessage)
+                } finally {
+                  setIsSubmitting(false)
+                }
               }}
               className="space-y-4 mt-4"
             >
@@ -311,9 +491,10 @@ export function VendorMovements() {
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  disabled={isSubmitting}
+                  className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
                 >
-                  Add Vendor
+                  {isSubmitting ? "Creating..." : "Add Vendor"}
                 </Button>
               </div>
             </form>
@@ -344,7 +525,7 @@ export function VendorMovements() {
         {(["all", "monitored", "unmonitored"] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             className={`px-3 py-1.5 text-xs md:text-sm font-medium rounded-md transition-colors ${
               activeTab === tab
                 ? "bg-background text-foreground shadow-sm"
@@ -370,7 +551,7 @@ export function VendorMovements() {
         </div>
 
         {/* Mobile Vendor List */}
-        {filteredVendors.map((vendor) => (
+        {paginatedVendors.map((vendor) => (
           <div
             key={vendor.id}
             className="flex items-center justify-between px-4 py-3 border-b border-border last:border-b-0 bg-background"
@@ -418,8 +599,40 @@ export function VendorMovements() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVendors.map((vendor) => (
-              <TableRow key={vendor.id} className="group">
+            {isLoading ? (
+              // Loading state
+              Array.from({ length: itemsPerPage }).map((_, index) => (
+                <TableRow key={`loading-${index}`}>
+                  <TableCell><div className="w-4 h-4 bg-muted animate-pulse rounded" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-muted animate-pulse rounded-full" />
+                      <div>
+                        <div className="w-24 h-4 bg-muted animate-pulse rounded mb-2" />
+                        <div className="w-32 h-3 bg-muted animate-pulse rounded" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 h-2 bg-muted animate-pulse rounded-full" />
+                      <div className="w-8 h-4 bg-muted animate-pulse rounded" />
+                      <div className="w-12 h-4 bg-muted animate-pulse rounded" />
+                    </div>
+                  </TableCell>
+                  <TableCell><div className="w-16 h-4 bg-muted animate-pulse rounded" /></TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="flex gap-1">
+                      <div className="w-16 h-5 bg-muted animate-pulse rounded" />
+                      <div className="w-20 h-5 bg-muted animate-pulse rounded" />
+                    </div>
+                  </TableCell>
+                  <TableCell><div className="w-8 h-4 bg-muted animate-pulse rounded" /></TableCell>
+                </TableRow>
+              ))
+            ) : (
+              paginatedVendors.map((vendor) => (
+                <TableRow key={vendor.id} className="group">
                 <TableCell>
                   <Checkbox
                     checked={selectedVendors.includes(vendor.id)}
@@ -496,24 +709,47 @@ export function VendorMovements() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )))}
           </TableBody>
         </Table>
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <button className="p-2 hover:bg-accent rounded-lg md:hidden border border-border">
+        <button 
+          className="p-2 hover:bg-accent rounded-lg md:hidden border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handlePrevPage}
+          disabled={isLoading || (isUsingApiData ? !hasPrev : currentPage <= 1)}
+        >
           <ChevronLeft className="w-5 h-5 text-muted-foreground" />
         </button>
-        <span className="text-muted-foreground">Page 1 of 10</span>
-        <button className="p-2 hover:bg-accent rounded-lg md:hidden border border-border">
+        <span className="text-muted-foreground">
+          Page {currentPage} of {totalPages || 1}
+          {isUsingApiData && ` (${totalItems} total)`}
+        </span>
+        <button 
+          className="p-2 hover:bg-accent rounded-lg md:hidden border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleNextPage}
+          disabled={isLoading || (isUsingApiData ? !hasNext : currentPage >= totalPages)}
+        >
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="hidden md:flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled className="gap-1 bg-transparent">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1 bg-transparent"
+            onClick={handlePrevPage}
+            disabled={isLoading || (isUsingApiData ? !hasPrev : currentPage <= 1)}
+          >
             Previous
           </Button>
-          <Button variant="outline" size="sm" className="gap-1 bg-transparent">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1 bg-transparent"
+            onClick={handleNextPage}
+            disabled={isLoading || (isUsingApiData ? !hasNext : currentPage >= totalPages)}
+          >
             Next
           </Button>
         </div>
