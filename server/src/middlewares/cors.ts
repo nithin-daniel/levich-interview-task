@@ -1,17 +1,18 @@
-import cors from 'cors';
+import cors from "cors";
 
 const corsOptions = {
   origin: [
-    'http://localhost:3000', // Next.js development server
-    'http://127.0.0.1:3000',
-    'https://localhost:3000',
-    process.env.FRONTEND_URL || '', // Production frontend URL
+    "http://localhost:3000", // Next.js development server
+    "http://127.0.0.1:3000",
+    "https://localhost:3000",
+     process.env.FRONTEND_URL || "", // Production frontend URL
+    "https://levich-interview-task.vercel.app", // for testing purpose the above env is not taking
     // Add your production domains here
   ],
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 };
 
 export const corsMiddleware = cors(corsOptions);
