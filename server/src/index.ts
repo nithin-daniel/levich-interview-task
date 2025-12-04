@@ -25,21 +25,6 @@ app.use('/api', apiRoutes);
 app.use(errorHandler);
 app.use('*', notFoundHandler);
 
-// Testing Purpose
-const cors = require('cors');
-app.use(cors({
-  origin: 'https://levich-interview-task.vercel.app',  // Exact Vercel URL
-  credentials: true,  // If using cookies/auth
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-
-
-// Explicit OPTIONS handler for preflights
-app.options('*', cors());
-
-
 // Start server
 app.listen(PORT, () => {
   logger.info(`\n🚀 Server running on http://localhost:${PORT}`);
