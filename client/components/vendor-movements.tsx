@@ -111,6 +111,11 @@ export function VendorMovements() {
   const [apiData, setApiData] = useState<Vendor[]>([])
   const [isUsingApiData, setIsUsingApiData] = useState(false)
   
+  // Search state
+  const [searchResults, setSearchResults] = useState<Vendor[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isUsingSearchResults, setIsUsingSearchResults] = useState(false)
+  
   const [formData, setFormData] = useState({
     name: "",
     domain: "",
@@ -122,7 +127,16 @@ export function VendorMovements() {
   // When using API data, pagination is handled by the server
   // When using fallback data, we handle pagination client-side
   const getFilteredVendors = () => {
-    if (isUsingApiData) {
+    if (isUsingSearchResults) {
+      // Return search results (they come pre-filtered from the search API)
+      return searchResults.filter((vendor) => {
+        const matchesTab =
+          activeTab === "all" ||
+          (activeTab === "monitored" && vendor.monitored) ||
+          (activeTab === "unmonitored" && !vendor.monitored)
+        return matchesTab
+      })
+    } else if (isUsingApiData) {
       // API data is already filtered and paginated by the server
       return apiData
     } else {
@@ -260,6 +274,37 @@ export function VendorMovements() {
     }
   }
 
+  // Search function using the search API
+  const searchVendors = async (title: string) => {
+    if (!title.trim()) {
+      setIsUsingSearchResults(false)
+      setSearchResults([])
+      return
+    }
+
+    try {
+      setIsSearching(true)
+      const response = await apiService.search.searchByTitle(title)
+      
+      if (response.success && response.data) {
+        setSearchResults(response.data.vendors || [])
+        setIsUsingSearchResults(true)
+        toast.success(response.message || `Found ${response.data.total || 0} vendor(s)`)
+      } else {
+        setSearchResults([])
+        setIsUsingSearchResults(false)
+        toast.error("No vendors found matching your search")
+      }
+    } catch (error) {
+      console.error('Search failed:', error)
+      toast.error("Search failed. Please try again.")
+      setSearchResults([])
+      setIsUsingSearchResults(false)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
   const handleSelectAll = () => {
     if (allSelected) {
       setSelectedVendors([])
@@ -296,10 +341,18 @@ export function VendorMovements() {
   // Search handler with debounce effect
   useEffect(() => {
     const delayedSearch = setTimeout(() => {
-      if (isUsingApiData) {
-        fetchVendors(1) // Reset to first page when searching
+      if (searchQuery.trim()) {
+        // Use search API when there's a search query
+        searchVendors(searchQuery)
       } else {
-        setCurrentPage(1) // Reset to first page for local filtering
+        // Clear search results when search query is empty
+        setIsUsingSearchResults(false)
+        setSearchResults([])
+        if (isUsingApiData) {
+          fetchVendors(1) // Reset to first page when searching
+        } else {
+          setCurrentPage(1) // Reset to first page for local filtering
+        }
       }
     }, 300)
 
@@ -504,22 +557,56 @@ export function VendorMovements() {
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {isSearching ? (
+            <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+          ) : (
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          )}
           <input
             type="text"
-            placeholder="Search"
+            placeholder="Search vendors by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-12 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+            disabled={isSearching}
           />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            ⌘K
-          </kbd>
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery("")
+                setIsUsingSearchResults(false)
+                setSearchResults([])
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <Button variant="outline" size="icon" className="bg-transparent shrink-0 h-9 w-9">
           <SlidersHorizontal className="w-4 h-4" />
         </Button>
       </div>
+
+      {/* Search Results Indicator */}
+      {isUsingSearchResults && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm">
+          <Search className="w-4 h-4 text-purple-600" />
+          <span className="text-purple-800">
+            Search results for "<span className="font-medium">{searchQuery}</span>" ({searchResults.length} found)
+          </span>
+          <button
+            onClick={() => {
+              setSearchQuery("")
+              setIsUsingSearchResults(false)
+              setSearchResults([])
+            }}
+            className="ml-auto text-purple-600 hover:text-purple-800"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
         {(["all", "monitored", "unmonitored"] as const).map((tab) => (
