@@ -1,70 +1,255 @@
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
-import { api } from './axios'
+import axios from 'axios'
 
-// Helper functions for different HTTP methods with enhanced error handling
+// =============================================================================
+// TYPE DEFINITIONS
+// =============================================================================
+
+// API Response wrapper
+export interface ApiResponse<T = any> {
+  success: boolean
+  message: string
+  data: T
+}
+
+// Error Response
+export interface ApiError {
+  success: false
+  message: string
+  errors?: Record<string, string[]>
+}
+
+// Auth Types
+export interface User {
+  id: string
+  email: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LoginCredentials {
+  email: string
+  password: string
+}
+
+export interface RegisterData {
+  email: string
+  password: string
+}
+
+export interface AuthResponse {
+  user: User
+  token: string
+}
+
+// Vendor Types
+export interface Vendor {
+  id: number
+  name: string
+  domain: string
+  logo?: string
+  logoColor?: string
+  rating: number
+  trend: number
+  trendUp: boolean
+  lastAssessed: string
+  status: string
+  categories: string[]
+  extraCategories: number
+  monitored: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateVendorData {
+  name: string
+  domain: string
+  logo?: string
+  logoColor?: string
+  rating: number
+  trend?: number
+  trendUp?: boolean
+  status?: string
+  categories: string[]
+  extraCategories?: number
+  monitored?: boolean
+}
+
+export interface UpdateVendorData extends Partial<CreateVendorData> {}
+
+export interface VendorFilters {
+  page?: number
+  limit?: number
+  search?: string
+  status?: string
+  monitored?: boolean
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}
+
+// =============================================================================
+// AXIOS CONFIGURATION
+// =============================================================================
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+// Create axios instance
+const api = axios.create({
+  baseURL: `${API_BASE_URL}/api`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000,
+})
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor to handle errors
+api.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  (error) => {
+    // Handle 401 unauthorized errors
+    if (error.response?.status === 401) {
+      // Clear auth data
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        
+        // Only redirect if we're not already on auth pages
+        if (!window.location.pathname.startsWith('/auth')) {
+          window.location.href = '/auth/login'
+        }
+      }
+    }
+    
+    return Promise.reject(error)
+  }
+)
+
+// =============================================================================
+// API SERVICE
+// =============================================================================
+
 export const apiService = {
-  get: <T = any>(endpoint: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-    return api.get(endpoint, config)
-  },
-  
-  post: <T = any>(endpoint: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-    return api.post(endpoint, data, config)
-  },
-  
-  put: <T = any>(endpoint: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-    return api.put(endpoint, data, config)
-  },
-  
-  delete: <T = any>(endpoint: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-    return api.delete(endpoint, config)
+  // =============================================================================
+  // AUTHENTICATION API
+  // =============================================================================
+  auth: {
+    async login(credentials: LoginCredentials) {
+      const response = await api.post('/auth/login', credentials)
+      return response.data
+    },
+
+    async register(userData: RegisterData) {
+      const response = await api.post('/auth/register', userData)
+      return response.data
+    },
+
+    async getCurrentUser() {
+      const response = await api.get('/auth/me')
+      return response.data
+    },
+
+    async logout() {
+      const response = await api.post('/auth/logout')
+      return response.data
+    },
   },
 
-  // Auth specific methods
-  auth: {
-    login: (credentials: { email: string; password: string }) => {
-      return api.post('/auth/login', credentials)
-    },
-    
-    register: (userData: { email: string; password: string }) => {
-      return api.post('/auth/register', userData)
-    },
-    
-    getCurrentUser: () => {
-      return api.get('/auth/me')
-    },
-  },
-  
-  // Vendor specific methods
+  // =============================================================================
+  // VENDORS API
+  // =============================================================================
   vendors: {
-    getAll: (params?: any) => {
-      return api.get('/vendors', { params })
+    async getAll(filters?: VendorFilters) {
+      const response = await api.get('/vendors', { params: filters })
+      return response.data
     },
-    
-    getById: (id: string) => {
-      return api.get(`/vendors/${id}`)
+
+    async getById(id: string | number) {
+      const response = await api.get(`/vendors/${id}`)
+      return response.data
     },
-    
-    create: (vendorData: any) => {
-      return api.post('/vendors', vendorData)
+
+    async create(vendorData: CreateVendorData) {
+      const response = await api.post('/vendors', vendorData)
+      return response.data
     },
-    
-    update: (id: string, vendorData: any) => {
-      return api.put(`/vendors/${id}`, vendorData)
+
+    async update(id: string | number, vendorData: UpdateVendorData) {
+      const response = await api.put(`/vendors/${id}`, vendorData)
+      return response.data
     },
-    
-    delete: (id: string) => {
-      return api.delete(`/vendors/${id}`)
+
+    async patch(id: string | number, vendorData: Partial<UpdateVendorData>) {
+      const response = await api.patch(`/vendors/${id}`, vendorData)
+      return response.data
+    },
+
+    async delete(id: string | number) {
+      const response = await api.delete(`/vendors/${id}`)
+      return response.data
+    },
+
+    async toggleMonitoring(id: string | number) {
+      const response = await api.patch(`/vendors/${id}/toggle-monitoring`)
+      return response.data
     },
   },
-  
-  // Vendor movements methods
-  vendorMovements: {
-    getAll: (params?: any) => {
-      return api.get('/vendor-movements', { params })
-    },
-    
-    getById: (id: string) => {
-      return api.get(`/vendor-movements/${id}`)
+
+  // =============================================================================
+  // HEALTH CHECK API
+  // =============================================================================
+  health: {
+    async check() {
+      const response = await axios.get(`${API_BASE_URL}/health`)
+      return response.data
     },
   },
 }
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Extract data from API response
+ */
+export const extractData = <T>(response: ApiResponse<T>): T => {
+  return response.data
+}
+
+/**
+ * Check if API response was successful
+ */
+export const isSuccessResponse = <T>(response: ApiResponse<T>): boolean => {
+  return response.success === true
+}
+
+/**
+ * Get error message from API error
+ */
+export const getErrorMessage = (error: any): string => {
+  if (error.response?.data?.message) {
+    return error.response.data.message
+  }
+  if (error.message) {
+    return error.message
+  }
+  return 'An unexpected error occurred'
+}
+
+export default apiService

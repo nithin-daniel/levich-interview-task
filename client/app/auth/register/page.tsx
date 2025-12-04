@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Eye, EyeOff, CheckCircle } from "lucide-react"
-import { apiService } from "@/lib/api"
+import { apiService, getErrorMessage, type RegisterData } from "@/lib/api"
 import { toast } from "sonner"
 
 interface RegisterForm {
@@ -46,12 +46,14 @@ export default function RegisterPage() {
     setSuccess("")
 
     try {
-      const response = await apiService.auth.register({
+      const registerPayload: RegisterData = {
         email: data.email,
         password: data.password,
-      })
+      }
+      
+      const response = await apiService.auth.register(registerPayload)
 
-      if (response.data?.success) {
+      if (response.success) {
         const successMessage = "Account created successfully! You can now sign in."
         setSuccess(successMessage)
         toast.success(successMessage)
@@ -60,10 +62,10 @@ export default function RegisterPage() {
           router.push("/auth/login")
         }, 2000)
       } else {
-        setError(response.data?.message || "Registration failed")
+        setError(response.message || "Registration failed")
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || "Network error. Please try again."
+      const errorMessage = getErrorMessage(err)
       setError(errorMessage)
     } finally {
       setIsLoading(false)

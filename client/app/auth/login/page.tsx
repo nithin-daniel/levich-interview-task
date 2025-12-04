@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Eye, EyeOff } from "lucide-react"
-import { apiService } from "@/lib/api"
+import { apiService, getErrorMessage, type LoginCredentials } from "@/lib/api"
 import { toast } from "sonner"
 
 interface LoginForm {
@@ -34,12 +34,15 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const response = await apiService.auth.login(data)
+      const response = await apiService.auth.login(data as LoginCredentials)
       
-      if (response.data?.success) {
-        // Store token in localStorage
-        localStorage.setItem("token", response.data.data.token)
-        localStorage.setItem("user", JSON.stringify(response.data.data.user))
+      if (response.success) {
+        const authData = response.data
+        
+        // Store token in localStorage and cookie
+        localStorage.setItem("token", authData.token)
+        localStorage.setItem("user", JSON.stringify(authData.user))
+        document.cookie = `auth-token=${authData.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
         
         toast.success("Welcome back! Redirecting to dashboard...")
         
@@ -48,10 +51,10 @@ export default function LoginPage() {
           router.push("/")
         }, 1000)
       } else {
-        setError(response.data?.message || "Login failed")
+        setError(response.message || "Login failed")
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || "Network error. Please try again."
+      const errorMessage = getErrorMessage(err)
       setError(errorMessage)
     } finally {
       setIsLoading(false)

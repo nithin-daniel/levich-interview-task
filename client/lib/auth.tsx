@@ -2,14 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { apiService } from './api'
-
-interface User {
-  id: string
-  email: string
-  createdAt: string
-  updatedAt: string
-}
+import { apiService, type User, getErrorMessage } from './api'
 
 interface AuthContextType {
   user: User | null
@@ -44,12 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Verify token is still valid by fetching current user
           try {
             const response = await apiService.auth.getCurrentUser()
-            if (response.data?.success) {
-              setUser(response.data.data.user)
-              localStorage.setItem('user', JSON.stringify(response.data.data.user))
+            if (response.success) {
+              setUser(response.data.user)
+              localStorage.setItem('user', JSON.stringify(response.data.user))
             }
           } catch (error) {
             // Token is invalid, clear auth data
+            console.warn('Token validation failed:', getErrorMessage(error))
             logout()
           }
         } catch (error) {
@@ -94,13 +88,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     try {
       const response = await apiService.auth.getCurrentUser()
-      if (response.data?.success) {
-        const updatedUser = response.data.data.user
-        setUser(updatedUser)
-        localStorage.setItem('user', JSON.stringify(updatedUser))
+      if (response.success) {
+        setUser(response.data.user)
+        localStorage.setItem('user', JSON.stringify(response.data.user))
       }
     } catch (error) {
-      console.error('Failed to refresh user:', error)
+      console.error('Failed to refresh user:', getErrorMessage(error))
       logout()
     }
   }
