@@ -4,26 +4,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { apiService, type Vendor, type CreateVendorData } from "@/lib/api";
+import { AddVendorModal } from "@/components/add-vendor-modal";
 import { toast } from "sonner";
 import {
-  Plus,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -115,10 +99,8 @@ export function VendorMovements() {
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVendors, setSelectedVendors] = useState<number[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>(fallbackVendors);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,13 +117,7 @@ export function VendorMovements() {
   const [isSearching, setIsSearching] = useState(false);
   const [isUsingSearchResults, setIsUsingSearchResults] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    domain: "",
-    rating: "",
-    status: "Active",
-    categories: [] as string[],
-  });
+
 
   // When using API data, pagination is handled by the server
   // When using fallback data, we handle pagination client-side
@@ -429,199 +405,7 @@ export function VendorMovements() {
           <RefreshCw className="w-4 h-4" />
           Import
         </Button>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add vendor
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Add New Vendor</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-
-                if (
-                  !formData.name.trim() ||
-                  !formData.domain.trim() ||
-                  !formData.rating
-                ) {
-                  toast.error("Please fill in all required fields.");
-                  return;
-                }
-
-                try {
-                  setIsSubmitting(true);
-
-                  const vendorData: CreateVendorData = {
-                    name: formData.name.trim(),
-                    domain: formData.domain.trim().toLowerCase(),
-                    rating: parseInt(formData.rating),
-                    status: formData.status,
-                    categories: formData.categories,
-                    monitored: false,
-                  };
-
-                  const response = await apiService.vendors.create(vendorData);
-
-                  if (response.success) {
-                    toast.success("Vendor created successfully!");
-
-                    // Refresh vendor list
-                    await fetchVendors();
-
-                    // Close dialog and reset form
-                    setIsDialogOpen(false);
-                    setFormData({
-                      name: "",
-                      domain: "",
-                      rating: "",
-                      status: "Active",
-                      categories: [],
-                    });
-                  }
-                } catch (error: any) {
-                  console.error("Failed to create vendor:", error);
-
-                  const errorMessage =
-                    error?.response?.data?.message ||
-                    error?.message ||
-                    "Failed to create vendor. Please try again.";
-
-                  toast.error(errorMessage);
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
-              className="space-y-4 mt-4"
-            >
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Vendor Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Enter vendor name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="domain">Domain</Label>
-                  <Input
-                    id="domain"
-                    placeholder="example.com"
-                    value={formData.domain}
-                    onChange={(e) =>
-                      setFormData({ ...formData, domain: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rating">Security Rating (0-100)</Label>
-                  <Input
-                    id="rating"
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="75"
-                    value={formData.rating}
-                    onChange={(e) =>
-                      setFormData({ ...formData, rating: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Categories</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      "Customer data",
-                      "Admin",
-                      "Business data",
-                      "Financials",
-                      "Database access",
-                      "Salesforce",
-                    ].map((category) => (
-                      <div
-                        key={category}
-                        className="flex items-center space-x-2"
-                      >
-                        <Checkbox
-                          id={category}
-                          checked={formData.categories.includes(category)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setFormData({
-                                ...formData,
-                                categories: [...formData.categories, category],
-                              });
-                            } else {
-                              setFormData({
-                                ...formData,
-                                categories: formData.categories.filter(
-                                  (c) => c !== category
-                                ),
-                              });
-                            }
-                          }}
-                        />
-                        <Label
-                          htmlFor={category}
-                          className="text-sm font-normal"
-                        >
-                          {category}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
-                >
-                  {isSubmitting ? "Creating..." : "Add Vendor"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <AddVendorModal onVendorAdded={() => fetchVendors()} />
       </div>
 
       <div className="flex items-center gap-2">
@@ -822,11 +606,6 @@ export function VendorMovements() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div
-                          className={`w-10 h-10 rounded-full bg-gradient-to-br ${vendor.logoColor} flex items-center justify-center text-white font-semibold text-sm shrink-0`}
-                        >
-                          {vendor.logo}
-                        </div>
                         <div>
                           <div className="font-medium text-foreground">
                             {vendor.name}
