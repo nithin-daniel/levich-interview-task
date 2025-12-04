@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth"
 import { Menu, Settings2, Search } from "lucide-react"
 
-export default function DashboardPage() {
+export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
 
