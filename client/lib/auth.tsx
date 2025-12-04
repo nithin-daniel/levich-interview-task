@@ -25,12 +25,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check for stored authentication on mount
     const initAuth = async () => {
-      // ✅ Check if we're in the browser first
-      if (typeof window === 'undefined') {
-        setIsLoading(false)
-        return
-      }
-
       const storedToken = localStorage.getItem('token')
       const storedUser = localStorage.getItem('user')
 
@@ -67,33 +61,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (newToken: string, newUser: User) => {
     setToken(newToken)
     setUser(newUser)
+    localStorage.setItem('token', newToken)
+    localStorage.setItem('user', JSON.stringify(newUser))
     
-    // ✅ Check browser environment
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', newToken)
-      localStorage.setItem('user', JSON.stringify(newUser))
-      
-      // Also set cookie for middleware
-      document.cookie = `auth-token=${newToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
-    }
+    // Also set cookie for middleware
+    document.cookie = `auth-token=${newToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
   }
 
   const logout = () => {
     setToken(null)
     setUser(null)
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
     
-    // ✅ Check browser environment
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      
-      // Clear cookie
-      document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      
-      // Only redirect if we're not already on auth pages
-      if (!window.location.pathname.startsWith('/auth')) {
-        router.push('/auth/login')
-      }
+    // Clear cookie
+    document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    
+    // Only redirect if we're not already on auth pages
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
+      router.push('/auth/login')
     }
   }
 
@@ -104,11 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiService.auth.getCurrentUser()
       if (response.success) {
         setUser(response.data.user)
-        
-        // ✅ Check browser environment
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(response.data.user))
-        }
+        localStorage.setItem('user', JSON.stringify(response.data.user))
       }
     } catch (error) {
       console.error('Failed to refresh user:', getErrorMessage(error))
