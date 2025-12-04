@@ -127,7 +127,6 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
         
         // Only redirect if we're not already on auth pages
         if (!window.location.pathname.startsWith('/auth')) {
@@ -186,26 +185,6 @@ export const apiService = {
 
     async create(vendorData: CreateVendorData) {
       const response = await api.post('/vendors', vendorData)
-      return response.data
-    },
-
-    async update(id: string | number, vendorData: UpdateVendorData) {
-      const response = await api.put(`/vendors/${id}`, vendorData)
-      return response.data
-    },
-
-    async patch(id: string | number, vendorData: Partial<UpdateVendorData>) {
-      const response = await api.patch(`/vendors/${id}`, vendorData)
-      return response.data
-    },
-
-    async delete(id: string | number) {
-      const response = await api.delete(`/vendors/${id}`)
-      return response.data
-    },
-
-    async toggleMonitoring(id: string | number) {
-      const response = await api.patch(`/vendors/${id}/toggle-monitoring`)
       return response.data
     },
   },
