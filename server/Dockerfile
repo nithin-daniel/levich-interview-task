@@ -22,6 +22,9 @@ RUN npx prisma generate
 # Build the application
 RUN npm run build
 
+# Seed the database with dummy data
+RUN npm run db:seed
+
 # Create logs directory
 RUN mkdir -p logs
 
