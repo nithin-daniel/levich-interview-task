@@ -1,10 +1,11 @@
 import cors from "cors";
 
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "https://levich-interview-task.vercel.app",
-  process.env.FRONTEND_URL,
+  // "http://localhost:3000",
+  // "http://127.0.0.1:3000",
+  // "https://levich-interview-task.vercel.app",
+  // process.env.FRONTEND_URL,
+  "*",
 ];
 
 export const corsMiddleware = cors({
