@@ -4,6 +4,7 @@ import { corsMiddleware } from './middlewares/cors';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import healthRoutes from './routes/health.routes';
 import apiRoutes from './routes/index';
+import { logger } from './utils/logger';
 
 // Load environment variables
 dotenv.config();
@@ -26,10 +27,10 @@ app.use('*', notFoundHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`⏰ Started at: ${new Date().toLocaleString()}\n`);
+  logger.info(`\n🚀 Server running on http://localhost:${PORT}`);
+  logger.info(`📊 Health check: http://localhost:${PORT}/health`);
+  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`⏰ Started at: ${new Date().toLocaleString()}\n`);
 });
 
 export default app;
