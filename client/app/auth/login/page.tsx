@@ -1,65 +1,71 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, Eye, EyeOff } from "lucide-react"
-import { apiService, getErrorMessage, type LoginCredentials } from "@/lib/api"
-import { toast } from "sonner"
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { apiService, getErrorMessage, type LoginCredentials } from "@/lib/api";
+import { toast } from "sonner";
 
 interface LoginForm {
-  email: string
-  password: string
+  email: string;
+  password: string;
 }
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const router = useRouter()
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>()
+  } = useForm<LoginForm>();
 
   const onSubmit = async (data: LoginForm) => {
-    setIsLoading(true)
-    setError("")
+    setIsLoading(true);
+    setError("");
 
     try {
-      const response = await apiService.auth.login(data as LoginCredentials)
-      
+      const response = await apiService.auth.login(data as LoginCredentials);
+
       if (response.success) {
-        const authData = response.data
-        
+        const authData = response.data;
+
         // Store token in localStorage and cookie
-        localStorage.setItem("token", authData.token)
-        localStorage.setItem("user", JSON.stringify(authData.user))
-        document.cookie = `auth-token=${authData.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
-        
-        toast.success("Welcome back! Redirecting to dashboard...")
-        
-        // Small delay to show the success message
-        setTimeout(() => {
-          router.push("/")
-        }, 1000)
+        localStorage.setItem("token", authData.token);
+        localStorage.setItem("user", JSON.stringify(authData.user));
+        document.cookie = `auth-token=${authData.token}; path=/; max-age=${
+          7 * 24 * 60 * 60
+        }; SameSite=Lax`;
+
+        toast.success("Welcome back! Redirecting to dashboard...");
+
+
+        window.location.href = "/";
       } else {
-        setError(response.message || "Login failed")
+        setError(response.message || "Login failed");
       }
     } catch (err: any) {
-      const errorMessage = getErrorMessage(err)
-      setError(errorMessage)
+      const errorMessage = getErrorMessage(err);
+      setError(errorMessage);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -68,8 +74,12 @@ export default function LoginPage() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mb-4">
             <span className="text-white font-bold text-lg">V</span>
           </div>
-          <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
-          <p className="text-muted-foreground text-sm mt-1">Sign in to your account</p>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Welcome back
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Sign in to your account
+          </p>
         </div>
 
         <Card>
@@ -104,7 +114,9 @@ export default function LoginPage() {
                   aria-invalid={errors.email ? "true" : "false"}
                 />
                 {errors.email && (
-                  <p className="text-destructive text-sm">{errors.email.message}</p>
+                  <p className="text-destructive text-sm">
+                    {errors.email.message}
+                  </p>
                 )}
               </div>
 
@@ -139,7 +151,9 @@ export default function LoginPage() {
                   </Button>
                 </div>
                 {errors.password && (
-                  <p className="text-destructive text-sm">{errors.password.message}</p>
+                  <p className="text-destructive text-sm">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
 
@@ -149,7 +163,9 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
+              <span className="text-muted-foreground">
+                Don't have an account?{" "}
+              </span>
               <Link
                 href="/auth/register"
                 className="text-primary hover:underline font-medium"
@@ -161,5 +177,5 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
